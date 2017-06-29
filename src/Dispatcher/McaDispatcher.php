@@ -107,11 +107,12 @@ class McaDispatcher {
 	 *        	]
 	 */
 	public function __construct(array $conf = []) {
-		$this->setConfig($conf);
+		$this->setConfig ( $conf );
 	}
 	/**
+	 *
 	 * @see \Tian\Dispatcher\McaDispatcher::__construct
-	 * @param array $conf
+	 * @param array $conf        	
 	 */
 	public function setConfig(array $conf) {
 		$allowCnf = array (
@@ -128,7 +129,7 @@ class McaDispatcher {
 				"loc_pattern",
 				"namespace_pattern",
 				"module_loc",
-				"namespace_pattern"
+				"namespace_pattern" 
 		);
 		foreach ( $conf as $key => $val ) {
 			if (property_exists ( $this, $key ) && in_array ( $key, $allowCnf )) {
@@ -175,6 +176,9 @@ class McaDispatcher {
 	 * @return boolean
 	 */
 	private function probe(array $m, $c, $a) {
+		$this->module = $m;
+		! is_null ( $this->logger ) && $this->logger->debug ( "dispatching://prepare to dispatch control:$c,action:$a" );
+		
 		$ml = $this->findModLoc ();
 		if ($ml === false) {
 			! is_null ( $this->logger ) && $this->logger->error ( 'find module location failed.' );
@@ -201,7 +205,7 @@ class McaDispatcher {
 				'{moduleloc}' => $ml,
 				'{control}' => $control 
 		) );
-		
+// 		var_dump($controlLoc);exit;
 		! is_null ( $this->logger ) && $this->logger->debug ( "dispatching://prepare to check class exists named $control_suffix_ns" );
 		if (! class_exists ( $control_suffix_ns, false )) {
 			
@@ -233,65 +237,45 @@ class McaDispatcher {
 		! is_null ( $this->logger ) && $this->logger->debug ( "dispatching://init control class" );
 		$rc = new \ReflectionClass ( $controller );
 		
-		! is_null ( $this->logger ) && $this->logger->debug ( "dispatching://check control implements the iController interface" );
-		if ($rc->implementsInterface ( '\tian\interfaces\IController' )) {
+		// 权限检查
+		
+		if (! $rc->hasMethod ( $this->privChk ) or ! $rc->getMethod ( $this->privChk )->isStatic ()) {
 			
-			! is_null ( $this->logger ) && $this->logger->debug ( "dispatching://control implemented the iController interface" );
-			// 权限检查
-			
-			if (! $rc->hasMethod ( $this->privChk ) or ! $rc->getMethod ( $this->privChk )->isStatic ()) {
-				
-				! is_null ( $this->logger ) && $this->logger->debug ( "dispatching://controller not function " . $this->privChk );
-				return false;
-			}
-			$privilege = call_user_func_array ( $controller . "::" . $this->privChk, array (
-					\tian\identityToken::getInstance () 
-			) );
-			
-			! is_null ( $this->logger ) && $this->logger->debug ( "dispatching://execute the check privilege function" );
-			if ($privilege !== true) {
-				
-				! is_null ( $this->logger ) && $this->logger->debug ( "dispatching://blocked by the privilege check" );
-				return false;
-			} else {
-				
-				! is_null ( $this->logger ) && $this->logger->debug ( "dispatching://pass the privilege check" );
-				$action = $this->filterAction ( $action );
-				$action_suffix = strtr ( $this->action_pattern, array (
-						"{action}" => $action 
-				) );
-				
-				! is_null ( $this->logger ) && $this->logger->debug ( "dispatching://assign the action:$action_suffix" );
-				// action存在
-				
-				! is_null ( $this->logger ) && $this->logger->debug ( "dispatching://check action exists" );
-				
-				if ($rc->hasMethod ( $action_suffix )) {
-					
-					! is_null ( $this->logger ) && $this->logger->debug ( "dispatching://action found,and invoked,dispatch end." );
-					$this->rc = $rc;
-					$this->rc_action = $action_suffix;
-					return true;
-					// ACTION不存在，但实现了iActionNotFound接口
-				} elseif ($rc->implementsInterface ( '\tian\interfaces\IActionNotFound' )) {
-					
-					! is_null ( $this->logger ) && $this->logger->debug ( "dispatching://action not found,but the control immplements the IActionNotFound interface" );
-					$action = $this->no_act;
-					$this->rc_action = $action;
-					
-					! is_null ( $this->logger ) && $this->logger->debug ( "dispatching://action is assigned to $action" );
-					$this->rc = $rc;
-					return true;
-				} else {
-					
-					! is_null ( $this->logger ) && $this->logger->debug ( "dispatching://action not found,and the control no implemtns the IActionNotFound interface,dispatch end" );
-					return false;
-				}
-			}
-		} else {
-			
-			! is_null ( $this->logger ) && $this->logger->debug ( "dispatching://the class have not implements iController interfaces,dispatch end" );
+			! is_null ( $this->logger ) && $this->logger->debug ( "dispatching://controller not function " . $this->privChk );
 			return false;
+		}
+		$privilege = call_user_func_array ( $controller . "::" . $this->privChk, [ ] );
+		
+		! is_null ( $this->logger ) && $this->logger->debug ( "dispatching://execute the check privilege function" );
+		if ($privilege !== true) {
+			! is_null ( $this->logger ) && $this->logger->debug ( "dispatching://blocked by the privilege check" );
+			return false;
+		} else {
+			! is_null ( $this->logger ) && $this->logger->debug ( "dispatching://pass the privilege check" );
+			$action = $this->filterAction ( $action );
+			$action_suffix = strtr ( $this->action_pattern, array (
+					"{action}" => $action 
+			) );
+			! is_null ( $this->logger ) && $this->logger->debug ( "dispatching://assign the action:$action_suffix" );
+			// action存在
+			! is_null ( $this->logger ) && $this->logger->debug ( "dispatching://check action exists" );
+			if ($rc->hasMethod ( $action_suffix )) {
+				! is_null ( $this->logger ) && $this->logger->debug ( "dispatching://action found,and invoked,dispatch end." );
+				$this->rc = $rc;
+				$this->rc_action = $action_suffix;
+				return true;
+				// ACTION不存在，但实现了iActionNotFound接口
+			} elseif ($rc->hasMethod ( $this->no_act )) {
+				! is_null ( $this->logger ) && $this->logger->debug ( "dispatching://action not found,but the control has {$this-> no_act} method." );
+				$action = $this->no_act;
+				$this->rc_action = $action;
+				! is_null ( $this->logger ) && $this->logger->debug ( "dispatching://action is assigned to $action" );
+				$this->rc = $rc;
+				return true;
+			} else {
+				! is_null ( $this->logger ) && $this->logger->debug ( "dispatching://action not found,and the control no implemtns the IActionNotFound interface,dispatch end" );
+				return false;
+			}
 		}
 	}
 	private function filterControl($control) {
@@ -342,14 +326,14 @@ class McaDispatcher {
 			return false;
 		}
 		if ($ma_str != "" && array_key_exists ( $ma_str, $this->module_arr )) {
-			! is_null ( $this->logger ) && $this->logger->debug ( "Dispatch://module loc:" . $this->module_arr [$ma_str] );
+			! is_null ( $this->logger ) && $this->logger->debug ( "dispatching://module loc:" . $this->module_arr [$ma_str] );
 			return $this->module_arr [$ma_str];
 		}
 		if ($this->module_loc == "") {
 			! is_null ( $this->logger ) && $this->logger->error ( "MODULE LOCATION NOT FOUND" );
 			return false;
 		}
-		! is_null ( $this->logger ) && $this->logger->debug ( "Dispatch://module loc:" . $this->module_loc );
+		! is_null ( $this->logger ) && $this->logger->debug ( "dispatching://module loc:" . $this->module_loc );
 		return $this->module_loc;
 	}
 }
