@@ -4,6 +4,10 @@
  * @Author: awei.tian
  * @Date: 2016年12月7日
  * @Desc: 
+ * 		本类的实质就是利用反射，按一定的规则NEW一个对象，在NEW之前执行静态权限检查函数
+ * 		如果通过，则NEW对象，并调用相应的方法
+ * 
+ * 
  * 		关于MODULE LOCATION查找方法
  * 			1) 网址中的MODULE数组JOIN("/"),如果结果为空,第三步
  *			2) 然后查表,如果表为空,第三步，如果找到相应的KEY，返回对应的VALUE，没有找到第三步
@@ -39,7 +43,7 @@ class McaDispatcher {
 	 *
 	 * @var string
 	 */
-	protected $control_pattern = "{control}";
+	protected $control_pattern = "control";
 	/**
 	 * 可用变量{action}
 	 *
@@ -54,11 +58,11 @@ class McaDispatcher {
 	protected $numeric_control_support = true;
 	protected $numeric_control_prefix = "_"; // 如果numericSupport为真，并且control_prefix为空才使用它
 	/**
-	 * 可用变量{moduleloc},{control}
+	 * 可用变量{moduleloc},{control},{module_name}
 	 *
 	 * @var string
 	 */
-	protected $loc_pattern = "{moduleloc}/{control}/control.php";
+	protected $loc_pattern = "{moduleloc}/app/modules/{module_name}/{control}/control.php";
 	/**
 	 * 可用变量{control},{module_name}
 	 *
@@ -88,7 +92,7 @@ class McaDispatcher {
 	 *        	[
 	 *        	"privChk" => "checkPrivilege",
 	 *        	"no_act" => "Action_not_found",
-	 *        	"control_pattern" => "{control}",
+	 *        	"control_pattern" => "control",
 	 *        	"action_pattern" => "{action}Action",
 	 *        	"numeric_control_support" => true,
 	 *        	"numeric_control_prefix" => "_",
@@ -97,7 +101,7 @@ class McaDispatcher {
 	 *        	"default_control" => "main",
 	 *        	"default_action" => "welcome",
 	 *        	"default_module_name" => "def",
-	 *        	"loc_pattern" => "{moduleloc}/{control}/{control_suffix}.php",
+	 *        	"loc_pattern" => "{moduleloc}/app/modules/{module_name}/{control}/control.php",
 	 *        	"namespace_pattern" => "\app\modules\{module_name}\{control}",
 	 *        	"module_loc" => "/webroot/www/balbal", 进行 rtrim('/') 只去右边
 	 *        	"module_arr" => [
@@ -110,9 +114,184 @@ class McaDispatcher {
 		$this->setConfig ( $conf );
 	}
 	/**
+	 * 默认值：checkPrivilege
+	 * 这个静态方法必须存在，否则会派遣失败
+	 * @param string $static_method_name
+	 * @return \Tian\Dispatcher\McaDispatcher
+	 */
+	public function setPrivChk($static_method_name) {
+		return $this->setConfig ( [
+				'privChk' => $static_method_name
+		] );
+	}
+	/**
+	 * 默认值:Action_not_found
+	 * 如果方法没有找到就执行的方法名
+	 * @param string $method_name
+	 * @return \Tian\Dispatcher\McaDispatcher
+	 */
+	public function setActionNotFound($method_name) {
+		return $this->setConfig ( [
+				'no_act' => $method_name
+		] );
+	}
+	/**
+	 * 默认值:control,可用变量{control}
+	 * 设置control方法名的规则,这里的名称前面加上NAMESPACE就是完整的类名
+	 * @param string $pattern
+	 * @return \Tian\Dispatcher\McaDispatcher
+	 */
+	public function setControlPattern($pattern) {
+		return $this->setConfig ( [
+				'control_pattern' => $pattern
+		] );
+	}
+	/**
+	 * 默认值:{action}Action,可用变量{action}
+	 * 设置ACTION方法名的规则
+	 * @param string $pattern
+	 * @return \Tian\Dispatcher\McaDispatcher
+	 */
+	public function setActionPattern($pattern) {
+		return $this->setConfig ( [
+				'action_pattern' => $pattern
+		] );
+	}
+	
+	/**
+	 * 默认值:true
+	 * 如果Control设置为全数字，是否使用加前缀的方法
+	 * @param bool $v
+	 * @return \Tian\Dispatcher\McaDispatcher
+	 */
+	public function setNumericControlSupport($v) {
+		return $this->setConfig ( [
+				'numeric_control_support' => $v
+		] );
+	}
+	/**
+	 * 默认值: _
+	 * 如果Control设置为全数字，方法名加的前缀
+	 * @param string $v
+	 * @return \Tian\Dispatcher\McaDispatcher
+	 */
+	public function setNumericControlPrefix($v) {
+		return $this->setConfig ( [
+				'numeric_control_prefix' => $v
+		] );
+	}
+	/**
+	 * 默认值:true
+	 * 如果ACTION设置为全数字，是否使用加前缀的方法
+	 * @param bool $v
+	 * @return \Tian\Dispatcher\McaDispatcher
+	 */
+	public function setNumericActionSupport($v) {
+		return $this->setConfig ( [
+				'numeric_action_support' => $v
+		] );
+	}
+	/**
+	 * 默认值: _
+	 * 如果ACTION设置为全数字，方法名加的前缀
+	 * @param string $v
+	 * @return \Tian\Dispatcher\McaDispatcher
+	 */
+	public function setNumericActionPrefix($v) {
+		return $this->setConfig ( [
+				'numeric_action_prefix' => $v
+		] );
+	}
+	/**
+	 * 默认值 :main
+	 * 设置如果CONTROL为空，用什么代替
+	 * @param string $name
+	 * @return \Tian\Dispatcher\McaDispatcher
+	 */
+	public function setDefaultControl($name) {
+		return $this->setConfig ( [
+				'default_control' => $name
+		] );
+	}
+	/**
+	 * 默认值 :welcome
+	 * 设置如果ACTION为空，用什么代替
+	 * @param string $name
+	 * @return \Tian\Dispatcher\McaDispatcher
+	 */
+	public function setDefaultAction($name) {
+		return $this->setConfig ( [
+				'default_action' => $name
+		] );
+	}
+	/**
+	 * 默认值 :def
+	 * 设置如果模块为空数组，模块名用什么
+	 * @param string $name
+	 * @return \Tian\Dispatcher\McaDispatcher
+	 */
+	public function setDefaultModuleName($name) {
+		return $this->setConfig ( [
+				'default_module_name' => $name
+		] );
+	}
+	/**
+	 * 默认值为NULL
+	 * 设置模块的目录路径
+	 * @param string $dir
+	 * @return \Tian\Dispatcher\McaDispatcher
+	 */
+	public function setModuleLoc($dir) {
+		return $this->setConfig ( [
+				'module_loc' => $dir
+		] );
+	}
+	/**
+	 * 默认值：\app\modules\{module_name}\{control}
+	 * 可用变量可用变量{control},{module_name}
+	 * @param string $pattern
+	 * @return \Tian\Dispatcher\McaDispatcher
+	 */
+	public function setNamespacePattern($pattern) {
+		return $this->setConfig ( [
+				'namespace_pattern' => $pattern
+		] );
+	}
+	/**
+	 * 默认值:{moduleloc}/app/modules/{module_name}/{control}/control.php
+	 * 可用变量{moduleloc},{control},{module_name}
+	 * 设置类文件路径规则,
+	 * 1. moduleloc文件路径/webroot/www/v
+	 * 2. control EG:main
+	 * 3. module_name 模块名
+	 *
+	 * @param string $pattern
+	 * @return \Tian\Dispatcher\McaDispatcher
+	 */
+	public function setLocPattern($pattern) {
+		// $this->loc_pattern = $pattern;
+		return $this->setConfig ( [
+				'loc_pattern' => $pattern
+		] );
+	}
+	/**
+	 * 默认值:[]
+	 * 设置MODULE LOC变量的映射表，这个表的优先级把MOD LOC变量优先级高
+	 * MAP的结构为模块名 => 路径,模块名为解析过后的模块名
+	 * @param array $map
+	 * @return \Tian\Dispatcher\McaDispatcher
+	 */
+	public function setModuleArr(array $map) {
+		return $this->setConfig ( [
+				'module_arr' => $map
+		] );
+	}
+	
+	/**
 	 *
 	 * @see \Tian\Dispatcher\McaDispatcher::__construct
-	 * @param array $conf        	
+	 * @param array $conf 
+	 * @return \Tian\Dispatcher\McaDispatcher       	
 	 */
 	public function setConfig(array $conf) {
 		$allowCnf = array (
@@ -129,6 +308,7 @@ class McaDispatcher {
 				"loc_pattern",
 				"namespace_pattern",
 				"module_loc",
+				"module_arr",
 				"namespace_pattern" 
 		);
 		foreach ( $conf as $key => $val ) {
@@ -136,6 +316,7 @@ class McaDispatcher {
 				$this->{$key} = $val;
 			}
 		}
+		return $this;
 	}
 	public function getModuleName() {
 		if (is_array ( $this->module )) {
@@ -151,22 +332,22 @@ class McaDispatcher {
 	}
 	/**
 	 *
-	 * @param array $m        	
 	 * @param string $c        	
 	 * @param string $a        	
+	 * @param array $m        	
 	 * @return boolean
 	 */
-	public function dispatch(array $m, $c, $a) {
+	public function dispatch($c = '', $a = '', array $m = []) {
 		return $this->probe ( $m, $c, $a );
 	}
 	/**
 	 * 调用ACTION
 	 */
 	public function invoke() {
+		$this->setActionArgs ( func_get_args () );
 		$controller = $this->rc->newInstance ();
 		$method = $this->rc->getMethod ( $this->rc_action );
-		$method->invokeArgs ( $controller, $this->rc_arg );
-		return;
+		return $method->invokeArgs ( $controller, $this->rc_arg );
 	}
 	/**
 	 *
@@ -177,7 +358,7 @@ class McaDispatcher {
 	 */
 	private function probe(array $m, $c, $a) {
 		$this->module = $m;
-		! is_null ( $this->logger ) && $this->logger->debug ( "dispatching://prepare to dispatch control:$c,action:$a" );
+		! is_null ( $this->logger ) && $this->logger->debug ( "dispatching://prepare to dispatch raw data: module:" . (var_export ( $m, true )) . " control:$c action:$a" );
 		
 		$ml = $this->findModLoc ();
 		if ($ml === false) {
@@ -187,6 +368,8 @@ class McaDispatcher {
 		// findmodloc保证了它现在的正确
 		$mn = $this->getModuleName ();
 		$control = $this->filterControl ( $c );
+		! is_null ( $this->logger ) && $this->logger->debug ( "dispatching://prepare to dispatch actual control:$control" );
+		
 		if ($control === false) {
 			! is_null ( $this->logger ) && $this->logger->debug ( "dispatching://control numeric is not support yet" );
 			return false;
@@ -202,10 +385,11 @@ class McaDispatcher {
 		$control_suffix_ns = $namespace . "\\" . $control_suffix;
 		
 		$controlLoc = strtr ( $this->loc_pattern, array (
+				'{module_name}' => $mn,
 				'{moduleloc}' => $ml,
 				'{control}' => $control 
 		) );
-// 		var_dump($controlLoc);exit;
+		// var_dump($controlLoc);exit;
 		! is_null ( $this->logger ) && $this->logger->debug ( "dispatching://prepare to check class exists named $control_suffix_ns" );
 		if (! class_exists ( $control_suffix_ns, false )) {
 			
@@ -253,6 +437,8 @@ class McaDispatcher {
 		} else {
 			! is_null ( $this->logger ) && $this->logger->debug ( "dispatching://pass the privilege check" );
 			$action = $this->filterAction ( $action );
+			! is_null ( $this->logger ) && $this->logger->debug ( "dispatching://prepare to dispatch actual action:$action" );
+			
 			$action_suffix = strtr ( $this->action_pattern, array (
 					"{action}" => $action 
 			) );

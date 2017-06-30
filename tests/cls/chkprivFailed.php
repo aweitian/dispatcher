@@ -5,9 +5,9 @@ class chkprivFailed {
 		return false;
 	}
 	public function welcomeAction() {
-		echo 'welcome.';
+		return 'welcome.';
 	}
 	public function testAction() {
-		echo 'hi.';
+		return'hi.';
 	}
 }

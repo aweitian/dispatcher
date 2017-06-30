@@ -1,13 +1,13 @@
 <?php
-namespace app\modules\def\chkpriv;
-class chkpriv {
+namespace app\modules\m2\m1\balabala;
+class control{
 	public static function checkPrivilege() {
 		return true;
 	}
 	public function welcomeAction() {
-		return 'welcome.';
+		return 'balabala:main-welcome.';
 	}
 	public function testAction() {
-		return 'hi.';
+		return'balabala:main-hi.';
 	}
 }
