@@ -276,7 +276,7 @@ class McaDispatcher {
 	}
 	/**
 	 * 默认值:[]
-	 * 设置MODULE LOC变量的映射表，这个表的优先级把MOD LOC变量优先级高
+	 * 设置MODULE LOC变量的映射表，这个表的优先级比MOD LOC变量优先级高
 	 * MAP的结构为模块名 => 路径,模块名为解析过后的模块名
 	 * @param array $map
 	 * @return \Tian\Dispatcher\McaDispatcher
